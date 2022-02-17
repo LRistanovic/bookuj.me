@@ -38,10 +38,12 @@ class StatusSerializer(serializers.ModelSerializer):
         fields = ("name")
 
 class ExchangeSerializer(serializers.ModelSerializer):
-    book = BookSerializer(many = True)
+    book_offered = BookSerializer(many = True)
+    book_returned = BookSerializer(many = True)
+    status = StatusSerializer()
     class Meta:
         model = Exchange
-        fields = ("image", "book")
+        fields = ("book_offered", "book_returned", "status", "date_published", "date_exchanged")
 
 class SaleSerializer(serializers.ModelSerializer):
     book = BookSerializer(many = True)
