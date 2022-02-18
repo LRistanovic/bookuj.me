@@ -1,16 +1,18 @@
-from .models import City, User, Genre, Author, Book, Image, Status, Exchange, Sale
 from rest_framework import serializers
+
+from .models import City, User, Genre, Author, Book, Image, Status, Exchange, Sale
 
 class CitySerializer(serializers.ModelSerializer):
     class Meta:
         model = City
-        fields = ("name")
+        fields = ["name"]
 
 class UserSerializer(serializers.ModelSerializer):
-    city = CitySerializer()
+    city = serializers.SlugRelatedField(read_only=True, slug_field='name')
+    email = serializers.EmailField()
     class Meta:
         model = User
-        fields = ("first_name", "last_name", "django_user", "city")
+        fields = ("id", "first_name", "last_name", "email", "city")
 
 class GenreSerializer(serializers.ModelSerializer):
     class Meta:
