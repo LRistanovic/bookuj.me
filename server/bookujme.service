@@ -1,0 +1,15 @@
+[Unit]
+Description=uWSGI instance to server bookuj.me project
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/var/www/bookuj.me/bookujme/
+Environment="PATH=/var/www/bookuj.me/.venv/bin"
+ExecStart=/var/www/bookuj.me/.venv/bin/uwsgi --ini /var/www/bookuj.me/server/uwsgi.ini
+KillSignal=SIGQUIT
+Type=notify
+NotifyAccess=all
+
+[Install]
+WantedBy=multi-user.target
