@@ -30,7 +30,7 @@ DEBUG = False # env('DEBUG')
 
 ALLOWED_HOSTS = [
     "127.0.0.1",
-    'bookuj.ml',
+    'api.bookuj.ml',
 ]
 
 # Application definition
