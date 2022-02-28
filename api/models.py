@@ -20,6 +20,9 @@ class User(models.Model):
     django_user = models.OneToOneField(django.contrib.auth.models.User, models.CASCADE)
     city = models.ForeignKey(City, models.CASCADE)
 
+    def __str__(self):
+        return 'User: ' + self.django_user.email
+
 class Genre(models.Model):
     '''
     This model holds different genres users can select when they are posting a new book.

@@ -46,6 +46,8 @@ class Users(APIView):
         
         if DjangoUser.objects.filter(email=data['email']).exists():
             return Response({'Error': 'User with given email already exists'}, status=status.HTTP_400_BAD_REQUEST)
+        if not City.objects.filter(name=data['city']).exists():
+            return Response({'Error': f'There is no city named {data["city"]} in the database.'}, status=status.HTTP_400_BAD_REQUEST)
 
         django_user = DjangoUser.objects.create(
             username=data['email'],
@@ -59,6 +61,8 @@ class Users(APIView):
             django_user=django_user,
             city=city
         )
+
+        data['id'] = user.id
         return Response(data, status=status.HTTP_201_CREATED)
 
 class UserDetails(APIView):
@@ -110,5 +114,6 @@ class UserDetails(APIView):
         if not request.user.is_authenticated or request.user.user.id != pk:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
         user = self.get_user(pk)
+        user.django_user.delete()
         user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
