@@ -25,9 +25,11 @@ class AuthorSerializer(serializers.ModelSerializer):
         fields = ("first_name", "last_name")
 
 class BookSerializer(serializers.ModelSerializer):
+    image_set = serializers.SlugRelatedField(read_only = True, slug_field='image')
     class Meta:
         model = Book
-        fields = ("name", "original_owner", "author", "genre", "edition", "preservation_level")
+        fields = ("name", "original_owner", "author", "genre", "edition", "preservation_level",, "image_set")
+
 class ImageSerializer(serializers.ModelSerializer):
     book = BookSerializer(many = True)
     class Meta:
