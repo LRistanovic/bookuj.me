@@ -117,3 +117,58 @@ class UserDetails(APIView):
         user.django_user.delete()
         user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+class BookList(APIView):
+    '''
+    List or post all books.
+    '''
+    def get(self, request, format=None):
+        '''
+        List all books.
+        '''
+        books = Book.objects.all()
+        serializer = BookSerializer(books, many = True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, format=None):
+        serializer = BookSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class BookDetails(APIView):
+    '''
+    Retrieve, update or delete book info
+    '''
+    def get_book(self, pk):
+        try:
+            return Book.objects.get(pk=pk)
+        except Book.DoesNotExist:
+            raise Http404
+    
+    def get(self, request, pk, format=None):
+        '''
+        Retrieve information about a single book
+        '''
+        book = self.get_book(pk)
+        serializer = BookSerializer(book)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, pk, format=None):
+        '''
+        Update book instance.
+        '''
+        book = self.get_book(pk)
+        serializer = BookSerializer(book, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def delete(self, request, pk, format=None):
+        '''
+        Delete object.
+        '''
+        book = self.get_book(pk)
+        book.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
