@@ -112,7 +112,7 @@ class UserDetails(APIView):
     
     def delete(self, request, pk, format=None):
         '''
-        Update an existing user that is authenticated and authorized
+        Delete an existing user that is authenticated and authorized
         '''
         if not request.user.is_authenticated or request.user.user.id != pk:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
@@ -122,6 +122,9 @@ class UserDetails(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 class Login(APIView):
+    '''
+    Ask for access and refresh token, provided email and password
+    '''
     def post(self, request, format=None):
         data = request.data
         if 'email' not in data.keys() or 'password' not in data.keys():
@@ -141,10 +144,16 @@ class Login(APIView):
         })
 
 class Authors(generics.ListAPIView):
+    '''
+    List all available authors
+    '''
     queryset = Author.objects.all()
     serializer_class = AuthorSerializer
 
 class Genres(generics.ListAPIView):
+    '''
+    List all available authors
+    '''
     queryset = Genre.objects.all()
     serializer_class = GenreSerializer
 
@@ -163,6 +172,9 @@ class Books(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request, format=None):
+        '''
+        Post a new book
+        '''
         data = request.data
         if set(data.keys()) != set(['name', 'author', 'genre', 'edition', 'preservation_level']):
             return Response({'Error': 'You haven\'t given all the neccessary data.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -207,19 +219,44 @@ class BookDetails(APIView):
         Retrieve information about a single book
         '''
         book = self.get_book(pk)
+        book.original_owner.email = book.original_owner.django_user.email
         serializer = BookSerializer(book)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def put(self, request, pk, format=None):
         '''
         Update book instance.
+        If updating name, edition, genre or preservation level, provide exact values.
+        If updating the author, provide the id of chosen value
         '''
+        data = request.data
         book = self.get_book(pk)
-        serializer = BookSerializer(book, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        if not request.user.is_authenticated or request.user.user != book.original_owner:
+            return Response({'Error': 'You are unauthorized to edit this book.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if 'name' in data:
+            book.name = data['name']
+        if 'edition' in data:
+            book.edition = data['edition']
+        if 'preservation_level' in data:
+            book.preservation_level = data['preservation_level']
+        if 'author' in data:
+            try:
+                book.author = Author.objects.get(id=data['author'])
+            except Author.DoesNotExist:
+                return Response({'Error': 'You provided an invalid author id.'}, status=status.HTTP_400_BAD_REQUEST)
+        if 'genre' in data:
+            try:
+                book.genre = Genre.objects.get(name=data['genre'])
+            except Genre.DoesNotExist:
+                return Response({'Error': 'You provided an invalid genre.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        book.save()
+
+        book.original_owner.email = book.original_owner.django_user.email
+        serializer = BookSerializer(book)
+        return Response(serializer.data)
     
     def delete(self, request, pk, format=None):
         '''
