@@ -1,13 +1,14 @@
 from django.shortcuts import render
 from django.contrib.auth.hashers import make_password
 from django.http import Http404
+from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 
 from django.contrib.auth.models import User as DjangoUser
-from .models import User, City
-from .serializers import UserSerializer, CitySerializer
+from .models import User, City, Book, Image
+from .serializers import UserSerializer, CitySerializer, BookSerializer, ImageSerializer
 
 class Cities(APIView):
     '''
@@ -117,9 +118,28 @@ class UserDetails(APIView):
         user.django_user.delete()
         user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-class BookList(APIView):
+
+class Login(APIView):
+    def post(self, request, format=None):
+        data = request.data
+        if 'email' not in data.keys() or 'password' not in data.keys():
+            return Response({'Error': 'You have to supply an email and a password.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user = User.objects.get(django_user__email=data['email'])
+        if user == User.objects.none():
+            return Response({'Error': 'Invalid email-password combination'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        access = AccessToken.for_user(user)
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            'access': str(access),
+            'refresh': str(refresh),
+            'user_id': str(user.id)
+        })
+
+class Books(APIView):
     '''
-    List or post all books.
+    List all books or post a new one.
     '''
     def get(self, request, format=None):
         '''
