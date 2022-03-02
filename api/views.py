@@ -1,14 +1,14 @@
 from django.shortcuts import render
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import make_password, check_password
 from django.http import Http404
-from rest_framework import status
+from rest_framework import status, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 
 from django.contrib.auth.models import User as DjangoUser
-from .models import User, City, Book, Image
-from .serializers import UserSerializer, CitySerializer, BookSerializer, ImageSerializer
+from .models import User, City, Book, Image, Author, Genre
+from .serializers import UserSerializer, CitySerializer, AuthorSerializer, GenreSerializer, BookSerializer
 
 class Cities(APIView):
     '''
@@ -50,6 +50,8 @@ class Users(APIView):
         if not City.objects.filter(name=data['city']).exists():
             return Response({'Error': f'There is no city named {data["city"]} in the database.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        print(data['password'])
+        print(make_password(data['password']))
         django_user = DjangoUser.objects.create(
             username=data['email'],
             password=make_password(data['password']),
@@ -124,18 +126,27 @@ class Login(APIView):
         data = request.data
         if 'email' not in data.keys() or 'password' not in data.keys():
             return Response({'Error': 'You have to supply an email and a password.'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        user = User.objects.get(django_user__email=data['email'])
-        if user == User.objects.none():
-            return Response({'Error': 'Invalid email-password combination'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        access = AccessToken.for_user(user)
-        refresh = RefreshToken.for_user(user)
+        django_user = DjangoUser.objects.get(email=data['email'])
+        if django_user == DjangoUser.objects.none():
+            return Response({'Error': 'Invalid email.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not check_password(data['password'], django_user.password):
+            return Response({'Error': 'Wrong password.'}, status=status.HTTP_404_NOT_FOUND)
+        access = AccessToken.for_user(django_user)
+        refresh = RefreshToken.for_user(django_user)
         return Response({
             'access': str(access),
             'refresh': str(refresh),
-            'user_id': str(user.id)
+            'user_id': str(django_user.user.id)
         })
+
+class Authors(generics.ListAPIView):
+    queryset = Author.objects.all()
+    serializer_class = AuthorSerializer
+
+class Genres(generics.ListAPIView):
+    queryset = Genre.objects.all()
+    serializer_class = GenreSerializer
 
 class Books(APIView):
     '''
@@ -146,15 +157,40 @@ class Books(APIView):
         List all books.
         '''
         books = Book.objects.all()
+        for book in books:
+            book.original_owner.email = book.original_owner.django_user.email
         serializer = BookSerializer(books, many = True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request, format=None):
-        serializer = BookSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        data = request.data
+        if set(data.keys()) != set(['name', 'author', 'genre', 'edition', 'preservation_level']):
+            return Response({'Error': 'You haven\'t given all the neccessary data.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not request.user.is_authenticated:
+            return Response({'Error': 'You have to be logged in to post a book.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        try:
+            author = Author.objects.get(id=data['author'])
+            genre = Genre.objects.get(id=data['genre'])
+            request.user.user.email = request.user.email
+            book = Book(
+                name=data['name'],
+                original_owner=request.user.user,
+                author=author,
+                genre=genre,
+                edition=data['edition'],
+                preservation_level=data['preservation_level'],
+            )
+            book.save()
+            return Response(BookSerializer(book).data, status=status.HTTP_201_CREATED)
+        except:
+            return Response({'Error': 'Invalid data.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # serializer = BookSerializer(data=request.data)
+        # if serializer.is_valid():
+        #     serializer.save()
+        #     return Response(serializer.data, status=status.HTTP_201_CREATED)
+        # return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class BookDetails(APIView):
     '''

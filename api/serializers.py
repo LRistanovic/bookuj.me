@@ -17,22 +17,25 @@ class UserSerializer(serializers.ModelSerializer):
 class GenreSerializer(serializers.ModelSerializer):
     class Meta:
         model = Genre
-        fields = ("name")
+        fields = ("name", 'id')
 
 class AuthorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Author
-        fields = ("first_name", "last_name")
+        fields = ("first_name", "last_name", 'id')
 
 class BookSerializer(serializers.ModelSerializer):
     # image_set = serializers.SlugRelatedField(read_only = True, many=True, slug_field='image')
+    original_owner = UserSerializer()
+    author = AuthorSerializer()
+    genre = serializers.SlugRelatedField(read_only=True, slug_field='name')
     class Meta:
         model = Book
         fields = ("name", "original_owner", "author", "genre", "edition", "preservation_level", "image_set")
 
 class ImageSerializer(serializers.ModelSerializer):
     # book = BookSerializer(many = True)
-    image = Base64ImageField()
+    image = serializers.ImageField()
     class Meta:
         model = Image
         fields = ("image", "book")
