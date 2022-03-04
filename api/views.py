@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from django.contrib.auth.hashers import make_password, check_password
 from django.http import Http404
-from rest_framework import status, generics
+from rest_framework import status, generics, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
@@ -143,19 +143,21 @@ class Login(APIView):
             'user_id': str(django_user.user.id)
         })
 
-class Authors(generics.ListAPIView):
+class Authors(generics.ListCreateAPIView):
     '''
-    List all available authors
+    List all available authors, or add a new one
     '''
     queryset = Author.objects.all()
     serializer_class = AuthorSerializer
+    permission_classes = [ permissions.IsAuthenticatedOrReadOnly ]
 
-class Genres(generics.ListAPIView):
+class Genres(generics.ListCreateAPIView):
     '''
-    List all available authors
+    List all available genres, or add a new one
     '''
     queryset = Genre.objects.all()
     serializer_class = GenreSerializer
+    permission_classes = [ permissions.IsAuthenticatedOrReadOnly ]
 
 class Books(APIView):
     '''
