@@ -5,9 +5,10 @@ from rest_framework import status, generics, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
+from datetime import date
 
 from django.contrib.auth.models import User as DjangoUser
-from .models import User, City, Book, Image, Author, Genre
+from .models import User, City, Book, Image, Author, Genre, Status, Sale, Exchange
 from .serializers import UserSerializer, CitySerializer, AuthorSerializer, GenreSerializer, BookSerializer
 
 class Cities(APIView):
@@ -178,8 +179,6 @@ class Books(APIView):
         Post a new book
         '''
         data = request.data
-        if set(data.keys()) != set(['name', 'author', 'genre', 'edition', 'preservation_level']):
-            return Response({'Error': 'You haven\'t given all the neccessary data.'}, status=status.HTTP_400_BAD_REQUEST)
         if not request.user.is_authenticated:
             return Response({'Error': 'You have to be logged in to post a book.'}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -196,20 +195,24 @@ class Books(APIView):
                 preservation_level=data['preservation_level'],
             )
             book.save()
-            if request.data['for_sale'] == True:
+
+            book_status = Status.objects.get(name='AVAILABLE')
+            if data.get('for_sale') == 'true' and 'price' in data.keys():
                 sale = Sale(
                     book=book,
                     buyer=None,
-                    status='AVAILABLE'
+                    status=book_status,
+                    date_published=date.today(),
                     date_sold=None,
-                    price=request.data['price'],
+                    price=request.data['price']
                 )
                 sale.save()
-            else:
+            if data.get('for_exchange') == 'true':
                 exchange = Exchange(
-                    book_offered=None,
+                    book_offered=book,
                     book_returned=None,
-                    status='AVAILABLE',
+                    status=book_status,
+                    date_published=date.today(),
                     date_exchanged=None,
                 )
                 exchange.save()
