@@ -196,6 +196,23 @@ class Books(APIView):
                 preservation_level=data['preservation_level'],
             )
             book.save()
+            if request.data['for_sale'] == True:
+                sale = Sale(
+                    book=book,
+                    buyer=None,
+                    status='AVAILABLE'
+                    date_sold=None,
+                    price=request.data['price'],
+                )
+                sale.save()
+            else:
+                exchange = Exchange(
+                    book_offered=None,
+                    book_returned=None,
+                    status='AVAILABLE',
+                    date_exchanged=None,
+                )
+                exchange.save()
             return Response(BookSerializer(book).data, status=status.HTTP_201_CREATED)
         except:
             return Response({'Error': 'Invalid data.'}, status=status.HTTP_400_BAD_REQUEST)
