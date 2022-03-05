@@ -206,6 +206,23 @@ class Books(APIView):
         #     return Response(serializer.data, status=status.HTTP_201_CREATED)
         # return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+class MyBooks(APIView):
+    '''
+    List all books of the logged in user.
+    '''
+    def get(self, request, format=None):
+        '''
+        List all books of the user.
+        '''
+        if not request.user.is_authenticated:
+            return Response({'Error': 'You aren\'t logged in'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        books = Book.objects.filter(original_owner=request.user.user)
+        for book in books:
+            book.original_owner.email = book.original_owner.django_user.email
+        serializer = BookSerializer(books, many = True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 class BookDetails(APIView):
     '''
     Retrieve, update or delete book info
