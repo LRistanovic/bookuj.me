@@ -11,6 +11,23 @@ from django.contrib.auth.models import User as DjangoUser
 from .models import User, City, Book, Image, Author, Genre, Status, Sale, Exchange
 from .serializers import UserSerializer, CitySerializer, AuthorSerializer, GenreSerializer, BookSerializer
 
+def check_availability(book):
+    '''
+    Checks whether the given book is available for sale or exchange
+    '''
+    available = Status.objects.get(name='AVAILABLE')
+    if Sale.objects.filter(book=book, status=available).exists():
+        book.for_sale = True
+        book.price = Sale.objects.get(book=book).price
+    else:
+        book.for_sale = False
+        book.price = None
+    if Exchange.objects.filter(book_offered=book, status=available).exists():
+        book.for_exchange = True
+    else:
+        book.for_exchange = False
+    return book
+
 class Cities(APIView):
     '''
     List all possible city options
@@ -168,9 +185,20 @@ class Books(APIView):
         '''
         List all books.
         '''
-        books = Book.objects.all()
+        books = []
+        sales = Sale.objects.all()
+        for sale in sales:
+            if sale.status == Status.objects.get(name='AVAILABLE'):
+                books.append(sale.book)
+        exchanges = Exchange.objects.all()
+        for exchange in exchanges:
+            if exchange.status == Status.objects.get(name='AVAILABLE'):
+                books.append(exchange.book_offered)
         for book in books:
             book.original_owner.email = book.original_owner.django_user.email
+            book = check_availability(book)
+            # if book.for_sale == False and book.for_exchange == False:
+            #     books.remove(book)
         serializer = BookSerializer(books, many = True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -216,15 +244,12 @@ class Books(APIView):
                     date_exchanged=None,
                 )
                 exchange.save()
+            
+            book.original_owner.email = book.original_owner.django_user.email
+            book = check_availability(book)
             return Response(BookSerializer(book).data, status=status.HTTP_201_CREATED)
         except:
             return Response({'Error': 'Invalid data.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # serializer = BookSerializer(data=request.data)
-        # if serializer.is_valid():
-        #     serializer.save()
-        #     return Response(serializer.data, status=status.HTTP_201_CREATED)
-        # return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class MyBooks(APIView):
     '''
@@ -240,6 +265,7 @@ class MyBooks(APIView):
         books = Book.objects.filter(original_owner=request.user.user)
         for book in books:
             book.original_owner.email = book.original_owner.django_user.email
+            book = check_availability(book)
         serializer = BookSerializer(books, many = True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -259,6 +285,7 @@ class BookDetails(APIView):
         '''
         book = self.get_book(pk)
         book.original_owner.email = book.original_owner.django_user.email
+        book = check_availability(book)
         serializer = BookSerializer(book)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -294,6 +321,7 @@ class BookDetails(APIView):
         book.save()
 
         book.original_owner.email = book.original_owner.django_user.email
+        book = check_availability(book)
         serializer = BookSerializer(book)
         return Response(serializer.data)
     
@@ -304,3 +332,60 @@ class BookDetails(APIView):
         book = self.get_book(pk)
         book.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+class BookBuy(APIView):
+    '''
+    Mark a book as bought
+    '''
+    def get(self, request, pk, format=None):
+        book = Book.objects.get(pk=pk)
+
+        if not request.user.is_authenticated:
+            return Response({'Error': 'You have to log in to buy a book.'}, status=status.HTTP_401_UNAUTHORIZED)
+        if not Sale.objects.filter(book=book).exists():
+            return Response({'Error': 'Chosen book is not available for sale.'}, status=status.HTTP_400_BAD_REQUEST)
+        if book.original_owner == request.user.user:
+            return Response({'Error': 'You can\'t buy your own book!'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        sale = Sale.objects.get(book=book)
+        if sale.status != Status.objects.get(name='AVAILABLE'):
+            return Response({'Error': 'Invalid book for sale.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        sale.buyer = request.user.user
+        sale.status = Status.objects.get(name='UNAVAILABLE')
+        sale.date_sold = date.today()
+
+        sale.save()
+        return Response(status=status.HTTP_200_OK)
+
+class BookExchange(APIView):
+    '''
+    Ask for book exchange
+    '''
+    def post(self, request, pk, format=None):
+        book_offered = Book.objects.get(pk=pk)
+        if not request.user.is_authenticated:
+            return Response({'Error': 'You have to log in to exchange for a book.'}, status=status.HTTP_401_UNAUTHORIZED)
+        if not Exchange.objects.filter(book_offered=book_offered).exists():
+            return Response({'Error': 'Chosen book is not available for exchange.'}, status=status.HTTP_400_BAD_REQUEST)
+        if book_offered.original_owner == request.user.user:
+            return Response({'Error': 'You can\'t exchange with your own book!'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        exchange = Exchange.objects.get(book_offered=book_offered)
+        if exchange.status != Status.objects.get(name='AVAILABLE'):
+            return Response({'Error': 'Invalid book for exchange.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            book_returned = Book.objects.get(id=request.data['book_id'])
+            if book_returned.original_owner != request.user.user:
+                return Response({'Error': 'You have to provide your book.'}, status=status.HTTP_403_FORBIDDEN)
+
+            exchange.book_returned = book_returned
+            exchange.status = Status.objects.get(name='PENDING')
+            exchange.date_exchanged = date.today()
+
+            exchange.save()
+            return Response(status=status.HTTP_200_OK)
+
+        except:
+            return Response({'Error': 'You offered an invalid book in return.'}, status=status.HTTP_400_BAD_REQUEST)

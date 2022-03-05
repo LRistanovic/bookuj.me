@@ -29,9 +29,12 @@ class BookSerializer(serializers.ModelSerializer):
     original_owner = UserSerializer()
     author = AuthorSerializer()
     genre = serializers.SlugRelatedField(read_only=True, slug_field='name')
+    for_sale = serializers.BooleanField()
+    price = serializers.DecimalField(10, 2)
+    for_exchange = serializers.BooleanField()
     class Meta:
         model = Book
-        fields = ("name", "original_owner", "author", "genre", "edition", "preservation_level", "image_set", 'id')
+        fields = ("name", "original_owner", "author", "genre", "edition", "preservation_level", "image_set", 'id', 'for_sale', 'price', 'for_exchange')
 
 class ImageSerializer(serializers.ModelSerializer):
     # book = BookSerializer(many = True)
