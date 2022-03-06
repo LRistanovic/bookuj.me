@@ -1,6 +1,6 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
-from .views import Users, UserDetails, Login, Cities, Authors, Genres, Books, MyBooks, BookDetails, BookBuy, BookExchange
+from .views import Users, UserDetails, Login, Cities, Authors, Genres, Books, MyBooks, BookDetails, BookBuy, BookExchange, ExchangeReply
 
 urlpatterns = [
     path('users/', Users.as_view()),
@@ -15,4 +15,5 @@ urlpatterns = [
     path('books/<int:pk>/', BookDetails.as_view()),
     path('books/<int:pk>/buy/', BookBuy.as_view()),
     path('books/<int:pk>/exchange/', BookExchange.as_view()),
+    path('books/<int:pk>/exchange-reply/', ExchangeReply.as_view()),
 ]

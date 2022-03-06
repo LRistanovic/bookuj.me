@@ -9,7 +9,7 @@ from datetime import date
 
 from django.contrib.auth.models import User as DjangoUser
 from .models import User, City, Book, Image, Author, Genre, Status, Sale, Exchange
-from .serializers import UserSerializer, CitySerializer, AuthorSerializer, GenreSerializer, BookSerializer
+from .serializers import UserSerializer, CitySerializer, AuthorSerializer, GenreSerializer, BookSerializer, ExchangeSerializer, SaleSerializer
 
 def check_availability(book):
     '''
@@ -390,20 +390,48 @@ class BookExchange(APIView):
         except:
             return Response({'Error': 'You offered an invalid book in return.'}, status=status.HTTP_400_BAD_REQUEST)
 
-class ExchangeAccept(APIView):
+class ExchangeReply(APIView):
+    '''
+    Accept or decline an exchange for the user's book
+    '''
     def post(self, request, pk, format=None):
         data = request.data
         book_offered = Book.objects.get(pk=pk)
+        if book_offered.original_owner != request.user.user:
+            return Response({'Error': 'You can only accept exchanges for your books.'}, status=status.HTTP_403_FORBIDDEN)
         exchange = Exchange.objects.get(book_offered=book_offered)
         if exchange.status == Status.objects.get(name='PENDING'):
-            if data.get('accept')  == 'true':
+            if data.get('reply')  == 'accept':
                 exchange.status = Status.objects.get(name='ACCEPTED')
+            elif data.get('reply') == 'decline':
+                exchange.status = Status.objects.get(name='DECLINED')
 
-class ExchangeDecline(APIView):
-    def post(self, request, pk, format=None):
-        data = request.data
-        book_offered = Book.objects.get(pk=pk)
-        exchange = Exchange.objects.get(book_offered=book_offered)
-        if exchange.status == Status.objects.get(name='PENDING'):
-            if data.get('accept')  == 'false':
-                exchange.status = Status.objects.get(name='DECLINE')
+class UserExchanges(APIView):
+    '''
+    List all exchanges associated with the user
+    '''
+    def get(self, request, format=None):
+        if not request.user.is_authenticated:
+            return Response({'Error': 'You have to be logged in.'}, status=status.HTTP_401_UNAUTHORIZED)
+        exchanges = Exchange.objects.filter(book_offered__original_owner=request.user.user)
+        for exchange in exchanges:
+            exchange.book_offered.original_owner.email = exchange.book_offered.original_owner.django_user.email
+            exchange.book_offered = check_availability(exchange.book_offered)
+            exchange.book_returned = check_availability(exchange.book_returned)
+        serializer = ExchangeSerializer(exchanges, many=True)
+        return Response(serializer.data, status=HTTP_200_OK)
+
+class UserSales(APIView):
+    '''
+    List all sales associated with the user
+    '''
+    def get(self, request, format=None):
+        if not request.user.is_authenticated:
+            return Response({'Error': 'You have to be logged in.'}, status=status.HTTP_401_UNAUTHORIZED)
+        sales = Sale.objects.filter(book__original_owner=request.user.user)
+        for sale in sales:
+            sale.book.original_owner.email = sale.book.original_owner.django_user.email
+            sale.book = check_availability(sale.book)
+            sale.book = check_availability(sale.book)
+        serializer = SaleSerializer(sales, many=True)
+        return Response(serializer.data, status=HTTP_200_OK)
