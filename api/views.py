@@ -405,5 +405,5 @@ class ExchangeDecline(APIView):
         book_offered = Book.objects.get(pk=pk)
         exchange = Exchange.objects.get(book_offered=book_offered)
         if exchange.status == Status.objects.get(name='PENDING'):
-            if data.get('accept')  == 'true':
+            if data.get('accept')  == 'false':
                 exchange.status = Status.objects.get(name='DECLINE')
