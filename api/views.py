@@ -389,3 +389,21 @@ class BookExchange(APIView):
 
         except:
             return Response({'Error': 'You offered an invalid book in return.'}, status=status.HTTP_400_BAD_REQUEST)
+
+class ExchangeAccept(APIView):
+    def post(self, request, pk, format=None):
+        data = request.data
+        book_offered = Book.objects.get(pk=pk)
+        exchange = Exchange.objects.get(book_offered=book_offered)
+        if exchange.status == Status.objects.get(name='PENDING'):
+            if data.get('accept')  == 'true':
+                exchange.status = Status.objects.get(name='ACCEPTED')
+
+class ExchangeDecline(APIView):
+    def post(self, request, pk, format=None):
+        data = request.data
+        book_offered = Book.objects.get(pk=pk)
+        exchange = Exchange.objects.get(book_offered=book_offered)
+        if exchange.status == Status.objects.get(name='PENDING'):
+            if data.get('accept')  == 'true':
+                exchange.status = Status.objects.get(name='DECLINE')
